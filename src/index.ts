@@ -1,5 +1,5 @@
-import SpecAuthApi from './SpecAuthApi'
-import SpecAuthClient from './SpecAuthClient'
+import SpecAuthApi from './api'
+import SpecAuthClient from './client'
 
 export { SpecAuthApi, SpecAuthClient }
 export * from './lib/types'
