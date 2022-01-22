@@ -29,19 +29,5 @@ export interface Session {
 
 export interface User {
     id: string
-    did?: UserDID
     createdAt: string
 }
-
-export interface UserDID {
-    userId: string
-    domain: string
-    provider: DIDProvider
-    email?: string
-    url?: string
-    avatar?: string
-    name?: string
-    description?: string
-}
-
-export type DIDProvider = 'ens'

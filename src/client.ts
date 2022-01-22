@@ -1,4 +1,4 @@
-import SpecAuthApi from './SpecAuthApi'
+import SpecAuthApi from './api'
 import { isBrowser } from './lib/helpers'
 import { SPEC_AUTH_URL, DEFAULT_HEADERS, STORAGE_KEY } from './lib/constants'
 import { polyfillGlobalThis } from './lib/polyfills'
