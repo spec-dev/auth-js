@@ -161,7 +161,9 @@ export default class SpecAuthClient {
      * Sets the session data from refreshToken and returns current Session and Error
      * @param refreshToken a JWT token
      */
-    async setSession(refreshToken: string): Promise<{ session: Session | null; error: ApiError | null }> {
+    async setSession(
+        refreshToken: string
+    ): Promise<{ session: Session | null; error: ApiError | null }> {
         try {
             if (!refreshToken) {
                 throw new Error('No current session.')

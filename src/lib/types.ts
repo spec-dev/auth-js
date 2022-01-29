@@ -9,7 +9,7 @@ export interface MessageNonce {
 
 export interface AuthSuccess {
     session: Session
-    user: User,
+    user: User
     isNewUser: boolean
 }
 
