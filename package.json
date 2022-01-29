@@ -1,5 +1,5 @@
 {
-    "name": "@spec/auth-client",
+    "name": "@spec.dev/auth-client",
     "version": "0.0.1",
     "description": "Spec auth client",
     "keywords": [
@@ -25,14 +25,13 @@
         "build": "genversion src/lib/version.ts --es6 && run-s clean format build:*",
         "build:main": "tsc -p tsconfig.json",
         "build:module": "tsc -p tsconfig.module.json",
-        "types-generate": "dts-gen -m '@spec/auth-client' -s",
+        "types-generate": "dts-gen -m '@spec.dev/auth-client' -s",
         "test": "jest --runInBand"
     },
     "dependencies": {
         "cross-fetch": "^3.0.6"
     },
     "devDependencies": {
-        "@types/faker": "^5.1.6",
         "@types/jest": "^26.0.13",
         "@types/jsonwebtoken": "^8.5.6",
         "@types/node": "^14.14.7",

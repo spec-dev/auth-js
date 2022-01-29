@@ -102,6 +102,7 @@ export default class SpecAuthClient {
         signature: string
     ): Promise<{
         session: Session | null
+        user: User | null
         isNewUser: boolean
         error: ApiError | null
     }> {
@@ -112,12 +113,12 @@ export default class SpecAuthClient {
             if (error) throw error
             if (!data) throw 'An error occurred on sign-in.'
 
-            const { session, isNewUser } = data
+            const { session, user, isNewUser } = data
             this._saveSession(session)
 
-            return { session, isNewUser, error: null }
+            return { session, user, isNewUser, error: null }
         } catch (e) {
-            return { session: null, isNewUser: false, error: e as ApiError }
+            return { session: null, user: null, isNewUser: false, error: e as ApiError }
         }
     }
 
@@ -160,9 +161,7 @@ export default class SpecAuthClient {
      * Sets the session data from refreshToken and returns current Session and Error
      * @param refreshToken a JWT token
      */
-    async setSession(
-        refreshToken: string
-    ): Promise<{ session: Session | null; error: ApiError | null }> {
+    async setSession(refreshToken: string): Promise<{ session: Session | null; error: ApiError | null }> {
         try {
             if (!refreshToken) {
                 throw new Error('No current session.')

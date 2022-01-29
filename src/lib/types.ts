@@ -9,6 +9,7 @@ export interface MessageNonce {
 
 export interface AuthSuccess {
     session: Session
+    user: User,
     isNewUser: boolean
 }
 
@@ -29,5 +30,4 @@ export interface Session {
 
 export interface User {
     id: string
-    createdAt: string
 }
