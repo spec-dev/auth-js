@@ -71,6 +71,7 @@ export default class SpecAuthClient {
         headers?: { [key: string]: string }
         autoRefreshToken?: boolean
         persistSessions?: boolean
+        recoverSessions?: boolean
         localStorage?: SupportedStorage
         fetch?: Fetch
     }) {
@@ -351,12 +352,10 @@ export default class SpecAuthClient {
                 } else {
                     this._removeSessions()
                 }
-            }
-            else if (!expiresAt || !currentSession || !currentSession.user) {
+            } else if (!expiresAt || !currentSession || !currentSession.user) {
                 console.log('Current session is missing data.')
                 this._removeSessions()
-            }
-            else {
+            } else {
                 // Use session as current one if not expired.
                 // Should be handled on _recoverActiveSession method already,
                 // but we still need the code here to accommodate for AsyncStorage e.g. in React native.
