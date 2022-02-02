@@ -23,12 +23,13 @@ const DEFAULT_OPTIONS = {
 }
 
 type AnyFunction = (...args: any[]) => any
+
 type MaybePromisify<T> = T | Promise<T>
 
 type PromisifyMethods<T> = {
     [K in keyof T]: T[K] extends AnyFunction
-    ? (...args: Parameters<T[K]>) => MaybePromisify<ReturnType<T[K]>>
-    : T[K]
+        ? (...args: Parameters<T[K]>) => MaybePromisify<ReturnType<T[K]>>
+        : T[K]
 }
 
 type SupportedStorage = PromisifyMethods<Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>>
@@ -202,7 +203,8 @@ export default class SpecAuthClient {
             // Get stored inactive session for the given address (if it exists).
             const { sessions = {} } = persistedSessions
             const inactiveSession = sessions[address]
-            if (!inactiveSession || !inactiveSession.expiresAt || !inactiveSession.user) return false
+            if (!inactiveSession || !inactiveSession.expiresAt || !inactiveSession.user)
+                return false
 
             // If not expired yet, use this session as the active one.
             const timeNow = Math.round(Date.now() / 1000)
@@ -236,7 +238,7 @@ export default class SpecAuthClient {
      * Receive a notification every time an auth event happens.
      * @returns {Subscription} A subscription object which can be used to unsubscribe itself.
      */
-     onStateChange(callback: (event: string, session: Session | null) => void): {
+    onStateChange(callback: (event: string, session: Session | null) => void): {
         data: Subscription | null
         error: ApiError | null
     } {
@@ -257,10 +259,7 @@ export default class SpecAuthClient {
     }
 
     /**
-     * Inside a browser context, `signOut()` will remove the logged in user from the browser session
-     * and log them out - removing all items from localstorage.
-     *
-     * For server-side management, you can disable sessions by passing a JWT through to `auth.api.signOut(JWT: string)`
+     * Remove the logged in user from the session, removing all items from localstorage.
      */
     async signOut(): Promise<{ error: ApiError | null }> {
         const accessToken = this.currentSession?.accessToken
@@ -403,10 +402,12 @@ export default class SpecAuthClient {
     }
 
     private async _getPersistedSessions(): Promise<PersistedSessions> {
-        return await this._getFromStorage(STORAGE_KEY) || {
-            sessions: {},
-            activeAddress: '',
-        }
+        return (
+            (await this._getFromStorage(STORAGE_KEY)) || {
+                sessions: {},
+                activeAddress: '',
+            }
+        )
     }
 
     private async _removeSessions() {
