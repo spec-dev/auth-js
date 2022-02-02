@@ -25,9 +25,29 @@ export interface Session {
     expiresAt?: number
     refreshToken?: string
     tokenType: string
-    user: User | null
+    user: User
 }
 
 export interface User {
     id: string
+}
+
+export interface PersistedSessions {
+    sessions: { [key: string]: Session }
+    activeAddress: string
+}
+
+export interface Subscription {
+    /**
+     * The subscriber UUID. This will be set by the client.
+     */
+    id: string
+    /**
+     * The function to call every time there is an event. eg: (eventName) => {}
+     */
+    callback: (event: string, session: Session | null) => void
+    /**
+     * Call this to remove the listener.
+     */
+    unsubscribe: () => void
 }
