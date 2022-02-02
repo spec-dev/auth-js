@@ -45,7 +45,7 @@ export interface Subscription {
     /**
      * The function to call every time there is an event. eg: (eventName) => {}
      */
-    callback: (event: string, session: Session | null) => void
+    callback: (event: string, user: User | null) => void
     /**
      * Call this to remove the listener.
      */

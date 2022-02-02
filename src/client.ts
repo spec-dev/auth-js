@@ -18,7 +18,8 @@ polyfillGlobalThis() // Make "globalThis" available
 const DEFAULT_OPTIONS = {
     url: SPEC_AUTH_URL,
     autoRefreshToken: true,
-    persistSession: true,
+    persistSessions: true,
+    recoverSessions: true,
     headers: DEFAULT_HEADERS,
 }
 
@@ -49,17 +50,19 @@ export default class SpecAuthClient {
     protected currentSession: Session | null
 
     protected autoRefreshToken: boolean
-    protected persistSession: boolean
+    protected persistSessions: boolean
     protected localStorage: SupportedStorage
     protected stateChangeEmitters: Map<string, Subscription> = new Map()
     protected refreshTokenTimer?: ReturnType<typeof setTimeout>
+    protected loading: boolean = true
 
     /**
      * Create a new client for use in the browser.
      * @param options.url The URL of the SpecAuth server.
      * @param options.headers Any additional headers to send to the SpecAuth server.
      * @param options.autoRefreshToken Set to "true" if you want to automatically refresh the token before expiring.
-     * @param options.persistSession Set to "true" if you want to automatically save the user session into local storage.
+     * @param options.persistSessions Set to "true" if you want to automatically save the user sessions into local storage.
+     * @param options.recoverSessions Set to "true" if you want to automatically recover sessions from local storage on init.
      * @param options.localStorage Provide your own local storage implementation to use instead of the browser's local storage.
      * @param options.fetch A custom fetch implementation.
      */
@@ -67,7 +70,7 @@ export default class SpecAuthClient {
         url?: string
         headers?: { [key: string]: string }
         autoRefreshToken?: boolean
-        persistSession?: boolean
+        persistSessions?: boolean
         localStorage?: SupportedStorage
         fetch?: Fetch
     }) {
@@ -75,15 +78,28 @@ export default class SpecAuthClient {
         this.currentUser = null
         this.currentSession = null
         this.autoRefreshToken = settings.autoRefreshToken
-        this.persistSession = settings.persistSession && isBrowser()
+        this.persistSessions = settings.persistSessions && isBrowser()
         this.localStorage = settings.localStorage || globalThis.localStorage
         this.api = new SpecAuthApi({
             url: settings.url,
             headers: settings.headers,
             fetch: settings.fetch,
         })
-        this._recoverActiveSession()
-        this._recoverAndRefresh()
+
+        if (settings.recoverSessions) {
+            this._recoverActiveSession()
+            this._recoverAndRefresh()
+        } else {
+            this._removeSessions()
+            this.loading = false
+        }
+    }
+
+    /**
+     * Returns whether the initial auth state is still being determined.
+     */
+    isLoading(): boolean {
+        return this.loading
     }
 
     /**
@@ -238,8 +254,8 @@ export default class SpecAuthClient {
      * Receive a notification every time an auth event happens.
      * @returns {Subscription} A subscription object which can be used to unsubscribe itself.
      */
-    onStateChange(callback: (event: string, session: Session | null) => void): {
-        data: Subscription | null
+    onStateChange(callback: (event: string, user: User | null) => void): {
+        listener: Subscription | null
         error: ApiError | null
     } {
         try {
@@ -252,9 +268,9 @@ export default class SpecAuthClient {
                 },
             }
             this.stateChangeEmitters.set(id, subscription)
-            return { data: subscription, error: null }
+            return { listener: subscription, error: null }
         } catch (err) {
-            return { data: null, error: err as ApiError }
+            return { listener: null, error: err as ApiError }
         }
     }
 
@@ -294,6 +310,7 @@ export default class SpecAuthClient {
             const expiresAt = currentSession.expiresAt
             if (expiresAt && expiresAt >= timeNow && currentSession.user) {
                 this._saveSession(currentSession)
+                this._notifyAllSubscribers(events.INITIAL_STATE_LOADED)
                 this._notifyAllSubscribers(events.SIGNED_IN)
             }
         } catch (error) {
@@ -309,7 +326,11 @@ export default class SpecAuthClient {
         try {
             // Get map of sessions persisted to storage.
             const persistedSessions = await this._getFromStorage(STORAGE_KEY)
-            if (!persistedSessions) return
+            if (!persistedSessions) {
+                this.loading = false
+                this._notifyAllSubscribers(events.INITIAL_STATE_LOADED)
+                return
+            }
 
             // Get the current session using the stored "active" address.
             const { sessions = {}, activeAddress } = persistedSessions
@@ -331,22 +352,22 @@ export default class SpecAuthClient {
                     this._removeSessions()
                 }
             }
-            // Remove any incomplete persisted session data.
             else if (!expiresAt || !currentSession || !currentSession.user) {
                 console.log('Current session is missing data.')
                 this._removeSessions()
             }
-            // Use session as current one if not expired.
             else {
-                // should be handled on _recoverActiveSession method already
-                // But we still need the code here to accommodate for AsyncStorage e.g. in React native
+                // Use session as current one if not expired.
+                // Should be handled on _recoverActiveSession method already,
+                // but we still need the code here to accommodate for AsyncStorage e.g. in React native.
                 this._saveSession(currentSession)
                 this._notifyAllSubscribers(events.SIGNED_IN)
             }
         } catch (err) {
             console.error(err)
-            return null
         }
+        this.loading = false
+        this._notifyAllSubscribers(events.INITIAL_STATE_LOADED)
     }
 
     private async _callRefreshToken(refreshToken = this.currentSession?.refreshToken) {
@@ -363,8 +384,8 @@ export default class SpecAuthClient {
             this._notifyAllSubscribers(events.SIGNED_IN)
 
             return { data, error: null }
-        } catch (e) {
-            return { data: null, error: e as ApiError }
+        } catch (err) {
+            return { data: null, error: err as ApiError }
         }
     }
 
@@ -373,6 +394,7 @@ export default class SpecAuthClient {
      * process to _startAutoRefreshToken if possible
      */
     private _saveSession(session: Session) {
+        this.loading = false
         this.currentSession = session
         this.currentUser = session.user
 
@@ -388,12 +410,12 @@ export default class SpecAuthClient {
             console.log('Current session is missing data.')
         }
 
-        if (isBrowser() && this.persistSession) {
-            this._persistSession(this.currentSession)
+        if (isBrowser() && this.persistSessions) {
+            this._persistSessions(this.currentSession)
         }
     }
 
-    private async _persistSession(currentSession: Session) {
+    private async _persistSessions(currentSession: Session) {
         const persistedSessions = await this._getPersistedSessions()
         const currentUserAddress = currentSession.user.id
         persistedSessions.sessions[currentUserAddress] = currentSession
@@ -430,7 +452,7 @@ export default class SpecAuthClient {
     }
 
     private _notifyAllSubscribers(event: string) {
-        this.stateChangeEmitters.forEach((x) => x.callback(event, this.currentSession))
+        this.stateChangeEmitters.forEach((x) => x.callback(event, this.currentUser))
     }
 
     private async _getFromStorage(key: string): Promise<any> {
