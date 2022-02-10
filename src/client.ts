@@ -395,7 +395,7 @@ export default class SpecAuthClient {
 
     private async _persistSessions(currentSession: Session) {
         const persistedSessions = await this._getPersistedSessions()
-        const currentUserAddress = currentSession.user.id
+        const currentUserAddress = currentSession.user.address || currentSession.user.id
         persistedSessions.sessions[currentUserAddress] = currentSession
         persistedSessions.activeAddress = currentUserAddress
         await this._setToStorage(STORAGE_KEY, persistedSessions)
