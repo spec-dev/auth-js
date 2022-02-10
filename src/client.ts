@@ -162,52 +162,6 @@ export default class SpecAuthClient {
         }
     }
 
-    /**
-     * Force refreshes the session including the user data in case it was updated in a different session.
-     */
-    async refreshSession(): Promise<{
-        session: Session | null
-        user: User | null
-        error: ApiError | null
-    }> {
-        try {
-            if (!this.currentSession?.accessToken) throw new Error('Not logged in.')
-
-            // currentSession and currentUser will be updated to latest on _callRefreshToken
-            const { error } = await this._callRefreshToken()
-            if (error) throw error
-
-            return { session: this.currentSession, user: this.currentUser, error: null }
-        } catch (e) {
-            return { session: null, user: null, error: e as ApiError }
-        }
-    }
-
-    /**
-     * Sets the session data from refreshToken and returns current Session and Error
-     * @param refreshToken a JWT token
-     */
-    async setSession(
-        refreshToken: string
-    ): Promise<{ session: Session | null; error: ApiError | null }> {
-        try {
-            if (!refreshToken) {
-                throw new Error('No current session.')
-            }
-
-            const { data, error } = await this.api.refreshAccessToken(refreshToken)
-            if (error) throw error
-            if (!data) throw Error('Invalid session data.')
-
-            this._saveSession(data)
-            this._notifyAllSubscribers(events.SIGNED_IN)
-
-            return { session: data, error: null }
-        } catch (e) {
-            return { error: e as ApiError, session: null }
-        }
-    }
-
     async switchToInactiveSession(address: string): Promise<boolean> {
         try {
             // Don't do anything if this address is already the active session user.
@@ -235,7 +189,10 @@ export default class SpecAuthClient {
             // Try refreshing the session using a refresh token (if configured to do so)
             // before switching to it as the active one.
             if (this.autoRefreshToken && inactiveSession.refreshToken) {
-                const { error } = await this._callRefreshToken(inactiveSession.refreshToken)
+                const { error } = await this._callRefreshToken(
+                    inactiveSession.refreshToken,
+                    inactiveSession.user,
+                )
                 if (error) {
                     console.error(error)
                     await this._removeSessions()
@@ -344,7 +301,10 @@ export default class SpecAuthClient {
             if (expiresAt && expiresAt < timeNow) {
                 // Refresh the session using a refresh token (if configured to do so).
                 if (this.autoRefreshToken && currentSession.refreshToken) {
-                    const { error } = await this._callRefreshToken(currentSession.refreshToken)
+                    const { error } = await this._callRefreshToken(
+                        currentSession.refreshToken,
+                        currentSession.user,
+                    )
                     if (error) {
                         console.log(error.message)
                         await this._removeSessions()
@@ -369,20 +329,30 @@ export default class SpecAuthClient {
         this._notifyAllSubscribers(events.INITIAL_STATE_LOADED)
     }
 
-    private async _callRefreshToken(refreshToken = this.currentSession?.refreshToken) {
+    private async _callRefreshToken(
+        refreshToken: string | undefined = this.currentSession?.refreshToken,
+        user: User | null = this.currentUser
+    ): Promise<{
+        data: Session | null
+        error: ApiError | null
+    }> {
         try {
-            if (!refreshToken) {
-                throw new Error('No current session.')
-            }
-            const { data, error } = await this.api.refreshAccessToken(refreshToken)
-            if (error) throw error
-            if (!data) throw Error('Invalid session data.')
+            if (!refreshToken) throw new Error('No current session.')
 
-            this._saveSession(data)
+            // Use the refresh token to get a new full session, with an access token.
+            const { data: session, error } = await this.api.refreshAccessToken(refreshToken)
+            if (error) throw error
+            if (!session || !session.user) throw Error('Invalid session data.')
+
+            // Allow user to be overridden so that the API call above doesn't have to always
+            // return full user data and can just focus on refreshing a session.
+            session.user = user || session.user
+
+            this._saveSession(session)
             this._notifyAllSubscribers(events.TOKEN_REFRESHED)
             this._notifyAllSubscribers(events.SIGNED_IN)
 
-            return { data, error: null }
+            return { data: session, error: null }
         } catch (err) {
             return { data: null, error: err as ApiError }
         }
