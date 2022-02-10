@@ -99,7 +99,7 @@ export default class SpecAuthClient {
     /**
      * Returns whether the initial auth state is still being determined.
      */
-    isLoading(): boolean {
+    isPendingInitialState(): boolean {
         return this.loading
     }
 
@@ -115,6 +115,15 @@ export default class SpecAuthClient {
      */
     session(): Session | null {
         return this.currentSession
+    }
+
+    /**
+     * Returns the authorization headers for the current session.
+     */
+    sessionHeaders(): { [key: string]: string } {
+        return this.currentSession
+            ? { 'Authorization': `Bearer ${this.currentSession.accessToken}` }
+            : {}
     }
 
     /**
