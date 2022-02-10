@@ -122,7 +122,7 @@ export default class SpecAuthClient {
      */
     sessionHeaders(): { [key: string]: string } {
         return this.currentSession
-            ? { 'Authorization': `Bearer ${this.currentSession.accessToken}` }
+            ? { Authorization: `Bearer ${this.currentSession.accessToken}` }
             : {}
     }
 
@@ -200,7 +200,7 @@ export default class SpecAuthClient {
             if (this.autoRefreshToken && inactiveSession.refreshToken) {
                 const { error } = await this._callRefreshToken(
                     inactiveSession.refreshToken,
-                    inactiveSession.user,
+                    inactiveSession.user
                 )
                 if (error) {
                     console.error(error)
@@ -312,7 +312,7 @@ export default class SpecAuthClient {
                 if (this.autoRefreshToken && currentSession.refreshToken) {
                     const { error } = await this._callRefreshToken(
                         currentSession.refreshToken,
-                        currentSession.user,
+                        currentSession.user
                     )
                     if (error) {
                         console.log(error.message)
