@@ -3,6 +3,7 @@ import { isBrowser, uuid } from './lib/helpers'
 import { SPEC_AUTH_URL, DEFAULT_HEADERS, STORAGE_KEY } from './lib/constants'
 import { polyfillGlobalThis } from './lib/polyfills'
 import events from './lib/events'
+import { performAuthHook } from './lib/hooks'
 import { Fetch } from './lib/fetch'
 import type {
     ApiError,
@@ -21,6 +22,7 @@ const DEFAULT_OPTIONS = {
     persistSessions: true,
     recoverSessions: true,
     headers: DEFAULT_HEADERS,
+    localDev: false,
 }
 
 type AnyFunction = (...args: any[]) => any
@@ -52,6 +54,9 @@ export default class SpecAuthClient {
     protected autoRefreshToken: boolean
     protected persistSessions: boolean
     protected localStorage: SupportedStorage
+    protected localDev: boolean
+    protected localApiKey: string | null
+    protected localAuthHook: string | null
     protected stateChangeEmitters: Map<string, Subscription> = new Map()
     protected refreshTokenTimer?: ReturnType<typeof setTimeout>
     protected loading: boolean = true
@@ -65,6 +70,9 @@ export default class SpecAuthClient {
      * @param options.recoverSessions Set to "true" if you want to automatically recover sessions from local storage on init.
      * @param options.localStorage Provide your own local storage implementation to use instead of the browser's local storage.
      * @param options.fetch A custom fetch implementation.
+     * @param options.localDev A boolean indicating whether your app is currently running in a local dev environment.
+     * @param options.localApiKey Spec API Key to use with local webhooks.
+     * @param options.localAuthHook The URL to hit with a webhook after auth has succeeded in local development.
      */
     constructor(options: {
         url?: string
@@ -74,6 +82,9 @@ export default class SpecAuthClient {
         recoverSessions?: boolean
         localStorage?: SupportedStorage
         fetch?: Fetch
+        localDev?: boolean
+        localApiKey?: string
+        localAuthHook?: string
     }) {
         const settings = { ...DEFAULT_OPTIONS, ...options }
         this.currentUser = null
@@ -81,6 +92,9 @@ export default class SpecAuthClient {
         this.autoRefreshToken = settings.autoRefreshToken
         this.persistSessions = settings.persistSessions && isBrowser()
         this.localStorage = settings.localStorage || globalThis.localStorage
+        this.localDev = settings.localDev
+        this.localApiKey = settings.localApiKey || null
+        this.localAuthHook = settings.localAuthHook || null
         this.api = new SpecAuthApi({
             url: settings.url,
             headers: settings.headers,
@@ -161,11 +175,19 @@ export default class SpecAuthClient {
             if (error) throw error
             if (!data) throw 'An error occurred on sign-in.'
 
-            const { session, user, isNewUser } = data
+            const { session, isNewUser } = data
+
+            // Hit local auth webhook if configured.
+            if (this._shouldPerformLocalAuthHook()) {
+                const { user, error: hookError } = await this._performLocalAuthHook(session.user)
+                if (hookError) throw hookError
+                session.user = user || session.user
+            }
+
             this._saveSession(session)
             this._notifyAllSubscribers(events.SIGNED_IN)
 
-            return { session, user, isNewUser, error: null }
+            return { session, user: session.user, isNewUser, error: null }
         } catch (e) {
             return { session: null, user: null, isNewUser: false, error: e as ApiError }
         }
@@ -471,5 +493,16 @@ export default class SpecAuthClient {
 
     private async _removeFromStorage(key: string) {
         isBrowser() && (await this.localStorage.removeItem(key))
+    }
+
+    private _shouldPerformLocalAuthHook(): boolean {
+        return this.localDev && !!this.localAuthHook
+    }
+
+    private async _performLocalAuthHook(user: User): Promise<{
+        user: User | null
+        error: ApiError | null
+    }> {
+        return await performAuthHook(user, this.localAuthHook!, this.localApiKey)
     }
 }
